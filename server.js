@@ -5,7 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const bcryptjs = require('bcryptjs');
 const session = require('express-session');
-const SQLiteStore = require('connect-sqlite3')(session);
+const MongoStore = require('connect-mongo');
 
 const mongoose = require('./db');
 const User = require('./models/User');
@@ -52,7 +52,7 @@ if (isProduction) {
 
 // Configure secure session management
 app.use(session({
-    store: new SQLiteStore({ db: './sessions.db' }),
+    store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI }),
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
     resave: false,
     saveUninitialized: false,

@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "connect-mongo": "^6.0.0",
     "connect-sqlite3": "^0.9.16",
     "express": "^5.2.1",
     "express-session": "^1.19.0",

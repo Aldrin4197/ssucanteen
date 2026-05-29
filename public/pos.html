@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSU Canteen - POS System</title>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="auth.js"></script>
+
+    <style>
+        :root {
+            --primary: #2e7d32;
+            --primary-light: #e8f5e9;
+            --secondary: #607d8b;
+            --danger: #c62828;
+            --bg: #f4f7f6;
+            --text: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            display: flex;
+            height: 100vh;
+            background: var(--bg);
+            overflow: hidden;
+            color: var(--text);
+        }
+
+        /* LEFT SIDE: PRODUCT SELECTION */
+        .main-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            overflow: hidden;
+
+            border: 1px solid rgb(145, 143, 143);
+        }
+
+        .header {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+            position: relative;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .header h2 {
+            position: absolute;
+            left: 0;
+            margin: 0;
+        }
+
+        #dateTimeDisplay {
+            flex: 1;
+            text-align: center;
+            min-width: 150px;
+        }
+
+        #user-info {
+            position: absolute;
+            right: 0;
+            flex-shrink: 0;
+        }
+
+        .products-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 15px;
+            overflow-y: auto;
+            padding-bottom: 20px;
+
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+            display: flex;
+            flex-direction: column;
+            height: 200px;
+        }
+
+        .product-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .product-card:active {
+            transform: scale(0.95);
+            border-color: var(--primary);
+        }
+
+        .product-card img {
+            width: 100%;
+            height: 110px;
+            object-fit: cover;
+            border-radius: 8px;
+            background: #eee;
+        }
+
+        .product-card .info {
+            margin-top: 10px;
+            flex: 1;
+        }
+
+        .product-card .name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .product-card .price {
+            color: var(--primary);
+            font-weight: 800;
+            font-size: 16px;
+        }
+
+        /* RIGHT SIDE: ORDER SIDEBAR */
+        .order-sidebar {
+            width: 400px;
+            background: white;
+            border-left: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -4px 0 15px rgba(0, 0, 0, 0.03);
+        }
+
+        .order-title {
+            padding: 20px;
+            background: var(--primary-light);
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .cart-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .cart-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+
+        .cart-item-info b {
+            display: block;
+            font-size: 14px;
+        }
+
+        .cart-item-info small {
+            color: #64748b;
+        }
+
+        .btn-remove {
+            background: none;
+            border: none;
+            color: var(--danger);
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .order-footer {
+            padding: 20px;
+            border-top: 2px solid #f1f5f9;
+            background: white;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+            font-weight: 800;
+        }
+
+        .action-btns {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-pay {
+            flex: 2;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        .btn-history {
+            flex: 1;
+            background: var(--secondary);
+            color: white;
+            border: none;
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* MODAL STYLE */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            width: 90%;
+            max-width: 600px;
+            height: 80vh;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            padding: 25px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        .history-item {
+            border-bottom: 1px solid #f1f5f9;
+            padding: 15px 0;
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .status-paid {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-unpaid {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .cart-item-info small {
+            display: block;
+            margin-top: 4px;
+        }
+
+        /* Make sure the product card is relative so the button stays inside it */
+        .product-card {
+            position: relative;
+            /* ... keep your other existing .product-card styles ... */
+        }
+
+        /* New Sold Out Button */
+        .btn-sold-out {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--danger);
+            border: 1px solid #fecaca;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+            transition: all 0.2s;
+        }
+
+        .btn-sold-out:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+
+        /* --- NEW: Category Cards & Popup for POS --- */
+        .cat-cards-container {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .cat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            flex: 1;
+            text-align: center;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            border: 2px solid transparent;
+            transition: 0.2s;
+        }
+
+        .cat-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-3px);
+        }
+
+        .cat-card h3 {
+            margin-top: 10px;
+            color: #0f3057;
+        }
+
+        .pos-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 4000;
+        }
+
+        .pos-modal-box {
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .cat-item-btn {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            border: 1px solid #edf2f7;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            background: #f8fafc;
+            transition: 0.2s;
+            width: 100%;
+            text-align: left;
+        }
+
+        .cat-item-btn:hover {
+            background: #e2e8f0;
+            border-color: var(--primary);
+        }
+
+        /* Update your existing .header h2 to this */
+        .header .brand-logo {
+            position: absolute;
+            left: 0;
+            margin: 0;
+            font-size: 1.5rem;
+            /* Larger size for desktop */
+            font-weight: 600;
+        }
+
+        .brand-logo .text-blue {
+            color: #0284c7;
+        }
+
+        .brand-logo .text-dark {
+            color: #1e293b;
+            /* Slightly softer than pure black */
+        }
+
+
+        /* --- MOBILE RESPONSIVENESS --- */
+
+        @media (max-width: 768px) {
+
+            /* Replace your existing .header h2 mobile rule with this */
+            .header .brand-logo {
+                position: relative;
+                left: auto;
+                width: auto;
+                text-align: left;
+                font-size: 1.1rem;
+                /* Scales down gracefully on mobile */
+                margin: 0;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+            
+
+            /* Keep the rest of your mobile CSS as is... */
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                position: relative;
+                display: flex;
+                flex-direction: row;
+                flex-wrap: nowrap;
+                justify-content: space-between;
+                align-items: center;
+                gap: 8px;
+                padding: max(6px, env(safe-area-inset-top)) 0 8px;
+                margin-bottom: 10px;
+                min-height: 0;
+                border-bottom: 1px solid #dbe3ea;
+            }
+
+            .header h2 {
+                position: relative;
+                left: auto;
+                width: auto;
+                text-align: left;
+                font-size: 16px;
+                font-weight: 700;
+                color: #000000;
+                margin: 0;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+
+            #dateTimeDisplay {
+                position: relative;
+                width: auto;
+                order: 0;
+                font-size: 10px;
+                text-align: center;
+                color: #666;
+                background: #f5f5f5;
+                padding: 3px 8px;
+                border-radius: 999px;
+                white-space: nowrap;
+                flex-shrink: 1;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            #user-info {
+                position: relative;
+                right: auto;
+                width: auto;
+                justify-content: flex-end;
+                order: 0;
+                flex-shrink: 0;
+            }
+
+            #user-info .logout-button {
+                padding: 8px 12px;
+                font-size: 11px;
+                min-width: auto;
+            }
+
+            #user-info .logout-button i {
+                width: 16px;
+                height: 16px;
+            }
+
+            body {
+                flex-direction: column;
+                min-height: 100dvh;
+                height: auto;
+                overflow-y: auto;
+            }
+
+            .main-panel {
+                flex: none;
+                height: auto;
+                overflow: visible;
+                padding: 8px 10px 12px;
+                border: none;
+            }
+
+            .main-panel h3 {
+                margin: 6px 0 10px 0 !important;
+                font-size: 16px;
+            }
+
+            /* Make the order sidebar sit at the bottom or stack */
+            .order-sidebar {
+                width: 100%;
+                height: auto;
+                border-left: none;
+                border-top: 1px solid #e2e8f0;
+                position: relative;
+            }
+
+            .cart-list {
+                max-height: 300px;
+                /* Limit cart height so it doesn't push footer off screen */
+            }
+
+            /* Adjust the Grid for smaller screens */
+            .products-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 8px;
+            }
+
+            .product-card {
+                height: 170px;
+                padding: 10px;
+            }
+
+            .product-card img {
+                height: 82px;
+            }
+
+            /* Category Cards - Scroll horizontally on mobile */
+            .cat-cards-container {
+                overflow-x: auto;
+                padding-bottom: 10px;
+            }
+
+            .cat-card {
+                min-width: 140px;
+                padding: 14px 12px;
+            }
+
+            /* Modals should take up more space on mobile */
+            .modal-content {
+                width: 95%;
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="main-panel">
+        <div class="header">
+            <h2 class="brand-logo">
+                <span class="text-blue">SSU</span>
+                <span class="text-dark">Canteen</span>
+            </h2>
+
+            <div id="dateTimeDisplay" style="font-weight: 500; color: #64748b;"></div>
+            <div id="user-info" style="margin-left: auto; display: flex; align-items: center; gap: 15px;"></div>
+        </div>
+
+        <h3 style="margin: 10px 0 15px 0; color: #0f3057; display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="soup"></i> Meals
+        </h3>
+        <div class="products-grid" id="productGrid" style="margin-bottom: 30px;">
+        </div>
+
+        <h3 style="margin: 0 0 15px 0; color: #0f3057; display: flex; align-items: center; gap: 8px;">
+            <i data-lucide="cookie"></i> Snacks & Drinks
+        </h3>
+        <div id="categoryContainer" class="cat-cards-container"></div>
+    </div>
+
+    <div class="order-sidebar">
+        <div class="order-title">
+            <i data-lucide="shopping-cart"></i>
+            Current Order
+        </div>
+
+        <div class="cart-list" id="cartList">
+        </div>
+
+        <div class="order-footer">
+            <div class="summary-row">
+                <span>Total Amount</span>
+                <span id="grandTotal">₱0.00</span>
+            </div>
+            <div class="action-btns">
+                <button class="btn-pay" onclick="processPayment()">
+                    PROCESS PAYMENT
+                </button>
+                <button class="btn-history" onclick="toggleHistory(true)" title="View History">
+                    <i data-lucide="history"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h3><i data-lucide="clock-rewind"></i> Recent Transactions</h3>
+                <button onclick="toggleHistory(false)"
+                    style="border:none; background:none; cursor:pointer; font-size:24px;">&times;</button>
+            </div>
+            <div id="historyList" style="flex:1; overflow-y:auto;">
+            </div>
+        </div>
+    </div>
+
+    <div id="paymentModal" class="modal">
+        <div class="modal-content" style="max-width:400px; height:auto;">
+            <h3 style="margin-bottom:20px; display:flex; align-items:center; gap:8px;">
+                <i data-lucide="credit-card"></i> Process Payment
+            </h3>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding:12px 14px; border-radius:10px; background:#f8fafc; border:1px solid #e2e8f0;">
+                <span style="font-size:14px; font-weight:600; color:#475569;">Total Amount</span>
+                <span id="paymentModalTotal" style="font-size:18px; font-weight:800; color:var(--primary);">₱0.00</span>
+            </div>
+
+            <label style="font-size:14px; font-weight:600;">Customer Name</label>
+            <input type="text" id="customerInput" placeholder="Enter customer name"
+                style="width:100%; padding:10px; margin:10px 0 20px; border-radius:8px; border:1px solid #cbd5e1;">
+
+            <label style="font-size:14px; font-weight:600;">Payment Status</label>
+
+            <div style="display:flex; gap:10px; margin:15px 0 20px;">
+                <button id="btnPaid"
+                    style="flex:1; padding:10px; border-radius:8px; border:none; cursor:pointer; background:#dcfce7; font-weight:700;">
+                    Paid
+                </button>
+
+                <button id="btnUnpaid"
+                    style="flex:1; padding:10px; border-radius:8px; border:none; cursor:pointer; background:#fee2e2; font-weight:700;">
+                    Unpaid
+                </button>
+            </div>
+
+            <!-- Unreturned Change Options - Only Show When Paid is Selected -->
+            <div id="unreturiedChangeSection"
+                style="display:none; margin-bottom:20px; padding:15px; background:#fef3c7; border-radius:8px; border:1px solid #fcd34d;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+                    <input type="checkbox" id="chkUnreturnedChange" style="width:18px; height:18px; cursor:pointer;">
+                    <label for="chkUnreturnedChange" style="font-size:14px; font-weight:600; cursor:pointer; margin:0;">
+                        Unreturned Change
+                    </label>
+                </div>
+
+                <!-- Amount Input - Only Show When Checkbox is Checked -->
+                <div id="unreturnedChangeAmountDiv" style="display:none;">
+                    <label style="font-size:13px; font-weight:600; color:#92400e;">Change Amount Not Returned
+                        (₱)</label>
+                    <input type="number" id="unreturnedChangeAmount" placeholder="0.00" step="0.01" min="0"
+                        style="width:100%; padding:10px; margin-top:5px; border-radius:8px; border:1px solid #fcd34d;">
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button onclick="closePaymentModal()"
+                    style="flex:1; padding:10px; border-radius:8px; border:1px solid #cbd5e1; background:white; cursor:pointer;">
+                    Cancel
+                </button>
+
+                <button onclick="submitPayment()"
+                    style="flex:2; padding:10px; border-radius:8px; border:none; background:var(--primary); color:white; font-weight:700; cursor:pointer;">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="markPaidModal" class="modal">
+        <div class="modal-content" style="max-width:400px; height:auto; text-align:center;">
+            <div style="color: #16a34a; margin-bottom: 15px;">
+                <i data-lucide="check-circle" style="width: 50px; height: 50px;"></i>
+            </div>
+            <h3 style="margin-bottom: 10px; color: #0f3057; font-size: 1.4rem;">Confirm Payment</h3>
+            <p style="color: #64748b; margin-bottom: 25px; font-size: 15px; line-height: 1.5;">Are you sure you want to
+                mark this order as <b>Paid</b>?</p>
+
+            <div style="display:flex; gap:10px;">
+                <button onclick="closeMarkPaidModal()"
+                    style="flex:1; padding:12px; border-radius:8px; border:1px solid #cbd5e1; background:white; cursor:pointer; font-weight: 600; color: #475569; transition: 0.2s;">
+                    Cancel
+                </button>
+
+                <button onclick="executeMarkPaid()"
+                    style="flex:1; padding:12px; border-radius:8px; border:none; background:#16a34a; color:white; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap: 8px; transition: 0.2s;">
+                    <i data-lucide="check" style="width: 18px;"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="markChangeReturnedModal" class="modal">
+        <div class="modal-content" style="max-width:400px; height:auto; text-align:center;">
+            <div style="color: #0284c7; margin-bottom: 15px;">
+                <i data-lucide="banknote" style="width: 50px; height: 50px;"></i>
+            </div>
+            <h3 style="margin-bottom: 10px; color: #0284c7;; font-size: 1.4rem;">Confirm Change Returned</h3>
+            <p id="markChangeReturnedMessage" style="color: #64748b; margin-bottom: 25px; font-size: 15px; line-height: 1.5;">
+                Are you sure you want to mark this unreturned change as returned?
+            </p>
+
+            <div style="display:flex; gap:10px;">
+                <button onclick="closeMarkChangeReturnedModal()"
+                    style="flex:1; padding:12px; border-radius:8px; border:1px solid #cbd5e1; background:white; cursor:pointer; font-weight: 600; color: #475569; transition: 0.2s;">
+                    Cancel
+                </button>
+
+                <button onclick="executeMarkChangeReturned()"
+                    style="flex:1; padding:12px; border-radius:8px; border:none; background:#0284c7; color:white; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap: 8px; transition: 0.2s;">
+                    <i data-lucide="check" style="width: 18px;"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal">
+        <div class="modal-content" style="max-width:400px; height:auto; text-align:center;">
+            <div style="color: var(--danger); margin-bottom: 15px;">
+                <i data-lucide="alert-circle" style="width: 50px; height: 50px;"></i>
+            </div>
+            <h3 style="margin-bottom: 10px; color: #0f3057; font-size: 1.4rem;">Confirm Sold Out</h3>
+            <p id="confirmMessage" style="color: #64748b; margin-bottom: 25px; font-size: 15px; line-height: 1.5;"></p>
+
+            <div style="display:flex; gap:10px;">
+                <button onclick="closeConfirmModal()"
+                    style="flex:1; padding:12px; border-radius:8px; border:1px solid #cbd5e1; background:white; cursor:pointer; font-weight: 600; color: #475569; transition: 0.2s;">
+                    Cancel
+                </button>
+
+                <button onclick="executeSoldOut()"
+                    style="flex:1; padding:12px; border-radius:8px; border:none; background:var(--danger); color:white; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap: 8px; transition: 0.2s;">
+                    <i data-lucide="eye-off" style="width: 18px;"></i> Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- Logout Confirmation Modal -->
+    <div id="logoutModal" class="modal">
+        <div class="modal-content" style="max-width:350px; height:auto; text-align:center;">
+            <div style="color: #dc2626; margin-bottom: 15px;">
+                <i data-lucide="log-out" style="width: 48px; height: 48px;"></i>
+            </div>
+            <h3 style="margin-bottom: 10px; color: #0f3057; font-size: 1.3rem;">Confirm Logout</h3>
+            <p style="color: #64748b; margin-bottom: 25px; font-size: 15px; line-height: 1.5;">Are you sure you want to
+                logout?</p>
+
+            <div style="display:flex; gap:10px;">
+                <button onclick="closeLogoutModal()"
+                    style="flex:1; padding:12px; border-radius:8px; border:1px solid #cbd5e1; background:white; cursor:pointer; font-weight: 600; color: #475569; transition: 0.2s;">
+                    Cancel
+                </button>
+
+                <button onclick="confirmLogout()"
+                    style="flex:1; padding:12px; border-radius:8px; border:none; background:#dc2626; color:white; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap: 8px; transition: 0.2s;">
+                    <i data-lucide="log-out" style="width: 18px;"></i> Logout
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let cart = [];
+        let categoryData = { snacks: [], drinks: [] };
+        let liveInventory = []; // <--- Global variable for live inventory
+
+        // Logout modal functions
+        function showLogoutModal() {
+            document.getElementById('logoutModal').style.display = 'flex';
+            lucide.createIcons();
+        }
+
+        function closeLogoutModal() {
+            document.getElementById('logoutModal').style.display = 'none';
+        }
+
+        async function confirmLogout() {
+            try {
+                const response = await fetch('/api/logout', { method: 'POST' });
+                if (response.ok) {
+                    window.location.href = '/login.html';
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                window.location.href = '/login.html';
+            }
+        }
+
+        async function fetchMenu() {
+            try {
+                const [invRes, resMeals, resSnacks, resDrinks] = await Promise.all([
+                    fetch('/inventory'),
+                    fetch('/customer-menu'),
+                    fetch('/get-category/snacks'),
+                    fetch('/get-category/drinks')
+                ]);
+
+                // 1. Fetch live inventory to check current stock levels
+                if (invRes.ok) {
+                    liveInventory = await invRes.json(); // Read it ONLY ONCE and save to global variable
+                }
+
+                // Helper function to check if an item has stock > 0
+                function isAvailable(itemId) {
+                    const liveItem = liveInventory.find(i => String(i.id) === String(itemId));
+                    if (!liveItem) return false;
+
+                    const stockStr = liveItem.stockDisplay || liveItem.stock || liveItem.quantity;
+                    if (!stockStr) return false;
+
+                    const match = stockStr.toString().match(/^([\d.]+)/);
+                    const qty = match ? parseFloat(match[1]) : 0;
+                    return qty > 0;
+                }
+
+                const meals = await resMeals.json();
+
+                // Fetch snacks and filter out 0 stock
+                if (resSnacks.ok) {
+                    const allSnacks = await resSnacks.json();
+                    categoryData.snacks = allSnacks.filter(item => isAvailable(item.id));
+                }
+
+                // Fetch drinks and filter out 0 stock
+                if (resDrinks.ok) {
+                    const allDrinks = await resDrinks.json();
+                    categoryData.drinks = allDrinks.filter(item => isAvailable(item.id));
+                }
+
+                // ... (the rest of your fetchMenu code for the grid stays the same below here) ...
+
+                const grid = document.getElementById('productGrid');
+
+                // --- GENERATE HOT MEALS ONLY IN GRID ---
+                if (meals.length > 0) {
+                    grid.innerHTML = meals.map(item => `
+                <div class="product-card" onclick="addToCart('${item.id}', '${item.name}', ${item.price})">
+                    <button class="btn-sold-out" onclick="event.stopPropagation(); markSoldOut('${item.id}', '${item.name}')" title="Mark as Sold Out">
+                        <i data-lucide="tag" style="width: 16px;"></i>
+                    </button>
+                    <img src="${item.url}" alt="${item.name}" loading="lazy">
+                    <div class="info">
+                        <div class="name">${item.name}</div>
+                        <div class="price">₱${parseFloat(item.price).toFixed(2)}</div>
+                    </div>
+                </div>
+            `).join('');
+                } else {
+                    grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; margin-top: 50px; color: #94a3b8;">No meals currently posted.</p>`;
+                }
+
+                // Render Category Cards above the grid
+                renderCategoryCards();
+                lucide.createIcons();
+            } catch (err) { console.error("Menu Load Error:", err); }
+        }
+
+        // --- NEW: Draw the category cards on the screen ---
+        function renderCategoryCards() {
+            const container = document.getElementById('categoryContainer');
+            container.innerHTML = `
+        <div class="cat-card" onclick="openCategoryModal('snacks')">
+            <i data-lucide="cookie" style="width: 36px; height: 36px; color: #f59e0b;"></i>
+            <h3>Snacks</h3>
+            <p id="snacks-count-indicator" style="font-size: 13px; color: #64748b; margin-top: 5px;">${categoryData.snacks.length} items</p>
+        </div>
+        <div class="cat-card" onclick="openCategoryModal('drinks')">
+            <i data-lucide="bottle-wine" style="width: 36px; height: 36px; color: #90EE90;"></i>
+            <h3>Drinks</h3>
+            <p id="drinks-count-indicator" style="font-size: 13px; color: #64748b; margin-top: 5px;">${categoryData.drinks.length} items</p>
+        </div>
+    `;
+            lucide.createIcons();
+        }
+
+
+        //  openCategoryModal function in pos.html
+        function openCategoryModal(category) {
+            let items = categoryData[category] || [];
+            const iconName = category === 'snacks' ? 'cookie' : 'coffee';
+
+            // --- NEW: Filter out items that are currently 0 stock based on the latest liveInventory! ---
+            items = items.filter(item => {
+                const liveItem = liveInventory.find(i => String(i.id) === String(item.id));
+                const stockText = liveItem ? (liveItem.stockDisplay || liveItem.stock || liveItem.quantity || "0") : "0";
+
+                // Check if the number is greater than 0
+                const match = String(stockText).match(/^([\d.]+)/);
+                const qty = match ? parseFloat(match[1]) : 0;
+                return qty > 0;
+            });
+
+            const modalHtml = `
+                <div id="posCategoryModal" class="pos-modal-overlay" style="display:flex;">
+                    <div class="pos-modal-box">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+                            <h2 style="text-transform: capitalize; color: #0f3057; display:flex; align-items:center; gap:8px;">
+                                <i data-lucide="${iconName}"></i> ${category}
+                            </h2>
+                            <button onclick="document.getElementById('posCategoryModal').remove()" style="background:none; border:none; font-size: 28px; cursor:pointer; color: #64748b;">&times;</button>
+                        </div>
+                        
+                        <div style="max-height: 60vh; overflow-y: auto; padding-right: 5px;">
+                            ${items.length === 0 ? '<p style="text-align:center; color:#64748b;">No items available.</p>' : ''}
+                            
+                            ${items.map(item => {
+                const price = parseFloat(item.sellingPrice || 0);
+                const liveItem = liveInventory.find(i => String(i.id) === String(item.id));
+                const stockText = liveItem ? (liveItem.stockDisplay || liveItem.stock || liveItem.quantity || "0") : "0";
+
+                // NEW: We added an ID to the button so the background script can find it and hide it!
+                return `
+                                <button id="pos-item-btn-${item.id}" class="cat-item-btn" onclick="addToCart('${item.id}', '${item.name.replace(/'/g, "\\'")}', ${price}); document.getElementById('posCategoryModal').remove();">
+                                    <div style="text-align: left;">
+                                        <div style="font-weight: 600; color: #333; font-size: 15px;">${item.name}</div>
+                                        <div style="font-size: 12px; color: #64748b; margin-top: 4px; font-weight: normal;">
+                                            Stock: <span id="stock-span-${item.id}" style="color: #2e7d32; font-weight: bold;">${stockText}</span>
+                                        </div>
+                                    </div>
+                                    <div style="font-weight: 700; color: var(--primary); font-size: 16px;">₱${price.toFixed(2)}</div>
+                                </button>
+                                `;
+            }).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const existing = document.getElementById('posCategoryModal');
+            if (existing) existing.remove();
+
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            lucide.createIcons();
+        }
+
+        // --- NEW: REAL-TIME BACKGROUND SYNC ---
+        // --- REAL-TIME BACKGROUND SYNC (With Auto-Hide & Category Counters) ---
+        async function fetchLiveStockSilently() {
+            try {
+                const invRes = await fetch('/inventory');
+                if (invRes.ok) {
+                    liveInventory = await invRes.json();
+
+                    // 1. Update the items inside the popup window
+                    liveInventory.forEach(liveItem => {
+                        const stockText = liveItem.stockDisplay || liveItem.stock || liveItem.quantity || "0";
+                        const match = String(stockText).match(/^([\d.]+)/);
+                        const qty = match ? parseFloat(match[1]) : 0;
+
+                        // Update the stock number text
+                        const stockSpan = document.getElementById(`stock-span-${liveItem.id}`);
+                        if (stockSpan) {
+                            stockSpan.innerText = stockText;
+                        }
+
+                        // Hide the button INSTANTLY if stock drops to 0
+                        const itemBtn = document.getElementById(`pos-item-btn-${liveItem.id}`);
+                        if (itemBtn) {
+                            if (qty <= 0) {
+                                itemBtn.style.display = 'none'; // Vanish
+                            } else {
+                                itemBtn.style.display = ''; // Show
+                            }
+                        }
+                    });
+
+                    // --- NEW: Recalculate and update the main category counts ---
+
+                    // Count available Snacks
+                    if (typeof categoryData !== 'undefined' && categoryData.snacks) {
+                        let availableSnacks = 0;
+                        categoryData.snacks.forEach(item => {
+                            const liveItem = liveInventory.find(i => String(i.id) === String(item.id));
+                            const stockText = liveItem ? (liveItem.stockDisplay || liveItem.stock || liveItem.quantity || "0") : "0";
+                            const match = String(stockText).match(/^([\d.]+)/);
+                            const qty = match ? parseFloat(match[1]) : 0;
+                            if (qty > 0) availableSnacks++;
+                        });
+
+                        const snacksIndicator = document.getElementById('snacks-count-indicator');
+                        if (snacksIndicator) {
+                            snacksIndicator.innerText = `${availableSnacks} items`;
+                        }
+                    }
+
+                    // Count available Drinks
+                    if (typeof categoryData !== 'undefined' && categoryData.drinks) {
+                        let availableDrinks = 0;
+                        categoryData.drinks.forEach(item => {
+                            const liveItem = liveInventory.find(i => String(i.id) === String(item.id));
+                            const stockText = liveItem ? (liveItem.stockDisplay || liveItem.stock || liveItem.quantity || "0") : "0";
+                            const match = String(stockText).match(/^([\d.]+)/);
+                            const qty = match ? parseFloat(match[1]) : 0;
+                            if (qty > 0) availableDrinks++;
+                        });
+
+                        const drinksIndicator = document.getElementById('drinks-count-indicator');
+                        if (drinksIndicator) {
+                            drinksIndicator.innerText = `${availableDrinks} items`;
+                        }
+                    }
+                }
+            } catch (err) {
+                // Fails silently if internet briefly drops
+            }
+        }
+        // Keep POS responsive while reducing background polling load.
+        setInterval(() => {
+            if (document.visibilityState !== 'visible') return;
+            fetchLiveStockSilently();
+        }, 2500);
+
+        // 2. Cart Functions
+        function addToCart(id, name, price) {
+            // 1. Find the live stock limit for this specific item
+            const liveItem = liveInventory.find(i => String(i.id) === String(id));
+            let maxStock = Infinity;
+
+            if (liveItem) {
+                const stockText = liveItem.stockDisplay || liveItem.stock || liveItem.quantity || "0";
+                const match = String(stockText).match(/^([\d.]+)/);
+                maxStock = match ? parseFloat(match[1]) : 0;
+            }
+
+            // 2. Check the cart to see if the item is already inside
+            const existing = cart.find(i => String(i.id) === String(id));
+
+            if (existing) {
+                if (existing.qty + 1 > maxStock) {
+                    return;
+                }
+                existing.qty++;
+            } else {
+                if (maxStock <= 0) {
+                    alert(`${name} is currently out of stock!`);
+                    return;
+                }
+                cart.push({ id, name, price, qty: 1 });
+            }
+
+            updateUI(); // <--- Make sure this matches your UI function name!
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            updateUI();
+        }
+
+        function increaseQty(index) {
+            const item = cart[index];
+
+            // 1. Find the live stock limit for this specific item
+            const liveItem = liveInventory.find(i => String(i.id) === String(item.id));
+            let maxStock = Infinity; // Default to unlimited (for hot meals)
+
+            if (liveItem) {
+                const stockText = liveItem.stockDisplay || liveItem.stock || liveItem.quantity || "0";
+                const match = String(stockText).match(/^([\d.]+)/);
+                maxStock = match ? parseFloat(match[1]) : 0;
+            }
+
+            // 2. Check if adding 1 more exceeds the max stock
+            if (item.qty + 1 > maxStock) {
+                return; // Stop the code here so the quantity does NOT increase
+            }
+
+            // 3. If we haven't reached the limit, increase it!
+            cart[index].qty++;
+            updateUI();
+        }
+
+        function decreaseQty(index) {
+            if (cart[index].qty > 1) {
+                cart[index].qty--;
+            } else {
+                // If qty becomes 0, remove item completely
+                cart.splice(index, 1);
+            }
+            updateUI();
+        }
+
+        function updateUI() {
+            const list = document.getElementById('cartList');
+            let total = 0;
+
+            list.innerHTML = cart.map((item, index) => {
+                const subtotal = item.price * item.qty;
+                total += subtotal;
+
+                return `
+                    <div class="cart-item">
+                        <div class="cart-item-info">
+                            <b>${item.name}</b>
+
+                            <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+                                <button onclick="decreaseQty(${index})"
+                                    style="width:26px; height:26px; border:none; background:#e2e8f0; cursor:pointer; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                    <i data-lucide="minus" style="width:14px;"></i>
+                                </button>
+
+                                <span style="font-weight:700; min-width:20px; text-align:center;">
+                                    ${item.qty}
+                                </span>
+
+                                <button onclick="increaseQty(${index})"
+                                    style="width:26px; height:26px; border:none; background:#e2e8f0; cursor:pointer; border-radius:6px; display:flex; align-items:center; justify-content:center;">
+                                    <i data-lucide="plus" style="width:14px;"></i>
+                                </button>
+                            </div>
+
+                            <small>₱${item.price.toFixed(2)} each</small>
+                        </div>
+
+                        <div style="display:flex; align-items:center; gap:10px;">
+                            <span style="font-weight:800;">₱${subtotal.toFixed(2)}</span>
+
+                            <button class="btn-remove" onclick="removeFromCart(${index})">
+                                <i data-lucide="trash-2" style="width:16px;"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('grandTotal').innerText = `₱${total.toFixed(2)}`;
+            document.getElementById('paymentModalTotal').innerText = `₱${total.toFixed(2)}`;
+
+            lucide.createIcons(); // IMPORTANT
+        }
+
+        // 3. Payment Processing
+        function processPayment() {
+            if (cart.length === 0) {
+                return;
+            }
+
+            document.getElementById('paymentModal').style.display = 'flex';
+            document.getElementById('paymentModalTotal').innerText = document.getElementById('grandTotal').innerText;
+            document.getElementById('customerInput').value = "";
+
+            // Reset unreturned change fields
+            document.getElementById('chkUnreturnedChange').checked = false;
+            document.getElementById('unreturnedChangeAmount').value = '';
+            document.getElementById('unreturnedChangeAmountDiv').style.display = 'none';
+
+            selectedStatus = "Paid";
+            highlightStatusButton();
+        }
+
+        // 4. History Modal Logic
+        async function toggleHistory(show) {
+            const modal = document.getElementById('historyModal');
+            if (show) {
+                modal.style.display = 'flex';
+                try {
+                    const res = await fetch('/order-history');
+                    const orders = await res.json();
+
+                    // Get today's date in same format
+                    const today = new Date().toLocaleDateString('en-PH', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    });
+
+                    // Filter only today's orders
+                    const todaysOrders = orders.filter(o => o.date === today);
+
+                    const list = document.getElementById('historyList');
+
+                    // Note: We assume each order has a unique 'id' from your database
+                    if (todaysOrders.length === 0) {
+                        list.innerHTML = `
+                            <p style="text-align:center; margin-top:40px; color:#94a3b8;">
+                                No transactions for today.
+                            </p>
+                        `;
+                        return;
+                    }
+
+                    list.innerHTML = todaysOrders.slice().reverse().map(o => `
+
+
+                        <div class="history-item">
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                                <span style="font-weight:700">${o.customer}</span>
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <span class="status-badge ${o.status === 'Paid' ? 'status-paid' : 'status-unpaid'}">
+                                        ${o.status}
+                                    </span>
+                                    ${o.status === 'Unpaid' ?
+                            `<button onclick="updatePaymentStatus('${o.id}', this)" 
+                                            style="padding:4px 8px; font-size:11px; cursor:pointer; background:#2e7d32; color:white; border:none; border-radius:4px; font-weight:bold;">
+                                            MARK AS PAID
+                                         </button>` : ''
+                        }
+                                </div>
+                            </div>
+                            <div style="font-size:12px; color:#64748b; margin-bottom:5px;">
+                                ${o.date} at ${o.time}
+                            </div>
+                            ${o.status === 'Paid' && o.unreturnedChangeAmount && o.unreturnedChangeAmount > 0 ?
+                            `<div style="font-size:12px; color:#92400e; font-weight:600; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
+                                    <span>Unreturned Change: ₱${parseFloat(o.unreturnedChangeAmount).toFixed(2)}</span>
+                                    <button onclick="openMarkChangeReturnedModal('${o.id}', '${String(o.customer || 'Guest').replace(/'/g, "\\'")}', ${parseFloat(o.unreturnedChangeAmount).toFixed(2)}, this)" 
+                                            style="padding:4px 8px; font-size:11px; cursor:pointer; background:#0284c7; color:white; border:none; border-radius:4px; font-weight:bold;">
+                                            CHANGE RETURNED
+                                    </button>
+                                </div>` : ''
+                        }
+                            <div style="font-size:13px; color:#475569;">
+                                ${o.items.map(i => `${i.name} (x${i.qty})`).join(', ')}
+                            </div>
+                            <div style="text-align:right; font-weight:800; color:var(--primary);">
+                                ₱${parseFloat(o.total).toFixed(2)}
+                            </div>
+                        </div>
+                    `).join('');
+                } catch (err) { console.error("Error loading history:", err); }
+            } else {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Store the order context globally so the modal knows what to update
+        let pendingPaidOrder = null;
+        let pendingChangeReturnedOrder = null;
+
+        // === REAL-TIME ORDER UPDATES (BroadcastChannel) ===
+        let orderUpdateChannel;
+        let menuUpdateChannel;
+        
+        function initializeOrderUpdateBroadcast() {
+            try {
+                // Try using BroadcastChannel for modern browsers
+                orderUpdateChannel = new BroadcastChannel('order-updates');
+            } catch (e) {
+                console.log('BroadcastChannel not supported, will use localStorage fallback');
+                orderUpdateChannel = null;
+            }
+        }
+
+        function initializeMenuUpdateBroadcast() {
+            try {
+                menuUpdateChannel = new BroadcastChannel('menu-updates');
+            } catch (e) {
+                console.log('BroadcastChannel not supported for menu updates, will use localStorage fallback');
+                menuUpdateChannel = null;
+            }
+        }
+        
+        function broadcastOrderUpdate(orderId, type) {
+            const message = {
+                type: 'ORDER_UPDATED',
+                orderId: orderId,
+                updateType: type, // 'status' or 'unreturned-change'
+                timestamp: new Date().toISOString()
+            };
+            
+            if (orderUpdateChannel) {
+                try {
+                    orderUpdateChannel.postMessage(message);
+                } catch (e) {
+                    console.log('Error broadcasting via BroadcastChannel, using localStorage fallback');
+                    localStorage.setItem('order-update-trigger', JSON.stringify(message));
+                }
+            } else {
+                // Fallback to localStorage
+                localStorage.setItem('order-update-trigger', JSON.stringify(message));
+            }
+            
+            console.log('Order update broadcasted:', message);
+        }
+
+        function broadcastMenuUpdate(itemId, action) {
+            const message = {
+                type: 'MENU_UPDATED',
+                itemId: itemId,
+                action: action,
+                timestamp: new Date().toISOString()
+            };
+
+            if (menuUpdateChannel) {
+                try {
+                    menuUpdateChannel.postMessage(message);
+                } catch (e) {
+                    console.log('Error broadcasting menu update, using localStorage fallback');
+                    localStorage.setItem('menu-update-trigger', JSON.stringify(message));
+                }
+            } else {
+                localStorage.setItem('menu-update-trigger', JSON.stringify(message));
+            }
+        }
+
+        function openMarkChangeReturnedModal(orderId, customerName, amount, button) {
+            pendingChangeReturnedOrder = { orderId, button };
+            document.getElementById('markChangeReturnedMessage').innerHTML =
+                `Are you sure you want to mark <b>${customerName || 'Guest'}</b>'s unreturned change of <b>Php ${parseFloat(amount || 0).toFixed(2)}</b> as returned?`;
+            document.getElementById('markChangeReturnedModal').style.display = 'flex';
+            lucide.createIcons();
+        }
+
+        function closeMarkChangeReturnedModal() {
+            document.getElementById('markChangeReturnedModal').style.display = 'none';
+            pendingChangeReturnedOrder = null;
+        }
+
+        async function executeMarkChangeReturned() {
+            if (!pendingChangeReturnedOrder) return;
+            const { orderId, button } = pendingChangeReturnedOrder;
+
+            try {
+                const res = await fetch(`/update-unreturned-change/${orderId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ unreturnedChangeAmount: 0 })
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    const unreturned = button.closest('div');
+                    if (unreturned) {
+                        unreturned.style.display = 'none';
+                    }
+
+                    closeMarkChangeReturnedModal();
+                    broadcastOrderUpdate(orderId, 'unreturned-change');
+                } else {
+                    alert(`Failed to mark change as returned: ${data.error || data.message}`);
+                }
+            } catch (err) {
+                console.error("Error:", err);
+                alert(`Server error: ${err.message}`);
+            }
+        }
+
+        window.addEventListener('click', (event) => {
+            if (event.target === document.getElementById('markPaidModal')) {
+                closeMarkPaidModal();
+            }
+
+            if (event.target === document.getElementById('markChangeReturnedModal')) {
+                closeMarkChangeReturnedModal();
+            }
+
+            if (event.target === document.getElementById('confirmModal')) {
+                closeConfirmModal();
+            }
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape') return;
+
+            closeMarkPaidModal();
+            closeMarkChangeReturnedModal();
+            closeConfirmModal();
+        });
+
+        function updatePaymentStatus(orderId, button) {
+            // Store the data temporarily
+            const badge = button.closest('.history-item').querySelector('.status-badge');
+
+            pendingPaidOrder = { orderId, button };
+            // Show the professional modal
+            document.getElementById('markPaidModal').style.display = 'flex';
+
+            // Update modal text based on context
+            const titleEl = document.querySelector('#markPaidModal h3');
+            const descEl = document.querySelector('#markPaidModal p');
+
+            titleEl.innerText = "Confirm Payment";
+            descEl.innerHTML = `Are you sure you want to mark this order as <b>Paid</b>?`;
+
+            lucide.createIcons();
+        }
+
+        function closeMarkPaidModal() {
+            document.getElementById('markPaidModal').style.display = 'none';
+            pendingPaidOrder = null; // clear it out
+        }
+
+        async function executeMarkPaid() {
+            if (!pendingPaidOrder) return;
+            const { orderId, button } = pendingPaidOrder;
+
+            try {
+                const res = await fetch(`/update-order-status/${orderId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: "Paid" })
+                });
+
+                if (res.ok) {
+                    // Update UI visually
+                    const parentDiv = button.closest('.history-item');
+                    const badge = parentDiv.querySelector('.status-badge');
+
+                    badge.innerText = "Paid";
+                    badge.classList.remove('status-unpaid');
+                    badge.classList.add('status-paid');
+                    button.remove();
+
+                    // Close the modal
+                    closeMarkPaidModal();
+                    
+                    // Broadcast the update to index.html
+                    broadcastOrderUpdate(orderId, 'status');
+                } else {
+                    alert("Failed to update status on the server.");
+                    closeMarkPaidModal();
+                }
+            } catch (err) {
+                console.error("Update Error:", err);
+                alert("Server error while updating status.");
+                closeMarkPaidModal();
+            }
+        }
+
+        // Clock Update
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('dateTimeDisplay').innerText = now.toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
+        }
+
+
+
+        setInterval(updateClock, 1000);
+        updateClock();
+        fetchMenu();
+        lucide.createIcons();
+
+        let selectedStatus = "Paid";
+
+        function closePaymentModal() {
+            document.getElementById('paymentModal').style.display = 'none';
+            // Reset the form
+            document.getElementById('customerInput').value = '';
+            document.getElementById('chkUnreturnedChange').checked = false;
+            document.getElementById('unreturnedChangeAmount').value = '';
+            document.getElementById('unreturnedChangeAmountDiv').style.display = 'none';
+            document.getElementById('unreturiedChangeSection').style.display = 'none';
+        }
+
+        document.getElementById('btnPaid').onclick = () => {
+            selectedStatus = "Paid";
+            highlightStatusButton();
+            // Show unreturned change section when Paid is selected
+            document.getElementById('unreturiedChangeSection').style.display = 'block';
+        };
+
+        document.getElementById('btnUnpaid').onclick = () => {
+            selectedStatus = "Unpaid";
+            highlightStatusButton();
+            // Hide unreturned change section when Unpaid is selected
+            document.getElementById('unreturiedChangeSection').style.display = 'none';
+            document.getElementById('chkUnreturnedChange').checked = false;
+            document.getElementById('unreturnedChangeAmountDiv').style.display = 'none';
+            document.getElementById('unreturnedChangeAmount').value = '';
+        };
+
+        // Handle checkbox toggle
+        document.addEventListener('DOMContentLoaded', () => {
+            // Initialize the broadcast channel for real-time updates
+            initializeOrderUpdateBroadcast();
+            initializeMenuUpdateBroadcast();
+            
+            const chkUnreturnedChange = document.getElementById('chkUnreturnedChange');
+            if (chkUnreturnedChange) {
+                chkUnreturnedChange.addEventListener('change', (e) => {
+                    const amountDiv = document.getElementById('unreturnedChangeAmountDiv');
+                    amountDiv.style.display = e.target.checked ? 'block' : 'none';
+                    if (!e.target.checked) {
+                        document.getElementById('unreturnedChangeAmount').value = '';
+                    }
+                });
+            }
+        });
+
+        function highlightStatusButton() {
+            const paidBtn = document.getElementById('btnPaid');
+            const unpaidBtn = document.getElementById('btnUnpaid');
+
+            // Reset all buttons first
+            paidBtn.style.background = "#dcfce7";
+            paidBtn.style.color = "black";
+            unpaidBtn.style.background = "#fee2e2";
+            unpaidBtn.style.color = "black";
+
+            // Highlight the selected status
+            if (selectedStatus === "Paid") {
+                paidBtn.style.background = "#16a34a";
+                paidBtn.style.color = "white";
+            } else if (selectedStatus === "Unpaid") {
+                unpaidBtn.style.background = "#dc2626";
+                unpaidBtn.style.color = "white";
+            }
+        }
+
+        async function submitPayment() {
+            const customerName = document.getElementById('customerInput').value || "Guest";
+            const chkUnreturnedChange = document.getElementById('chkUnreturnedChange');
+            const unreturnedChangeAmount = document.getElementById('unreturnedChangeAmount').value;
+
+            let paymentStatus = selectedStatus; // Always "Paid" or "Unpaid"
+            let unreturnedAmount = null;
+
+            // Check if unreturned change is selected
+            if (selectedStatus === "Paid" && chkUnreturnedChange && chkUnreturnedChange.checked) {
+                if (!unreturnedChangeAmount || parseFloat(unreturnedChangeAmount) <= 0) {
+                    alert('Please enter the unreturned change amount');
+                    return;
+                }
+                unreturnedAmount = parseFloat(unreturnedChangeAmount);
+            }
+
+            const now = new Date();
+            const orderData = {
+                customer: customerName,
+                items: cart,
+                total: cart.reduce((s, i) => s + (i.price * i.qty), 0),
+                status: paymentStatus,
+                unreturnedChangeAmount: unreturnedAmount,
+                date: now.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }),
+                time: now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' })
+            };
+
+            try {
+                const res = await fetch('/place-order', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(orderData)
+                });
+
+                if (res.ok) {
+                    cart = [];
+                    updateUI();
+                    closePaymentModal();
+                }
+            } catch (err) {
+                alert("Error saving transaction.");
+            }
+        }
+
+        // 5. Custom Sold Out Confirmation Logic
+        let itemToMarkSoldOut = null; // Store the item globally temporarily
+
+        function markSoldOut(id, name) {
+            itemToMarkSoldOut = { id, name };
+
+            // Set the dynamic message
+            document.getElementById('confirmMessage').innerHTML = `Are you sure <b>"${name}"</b> is sold out?<br>This will remove it from the menu.`;
+
+            // Show the custom modal
+            document.getElementById('confirmModal').style.display = 'flex';
+            lucide.createIcons(); // Refresh icons inside the modal
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+            itemToMarkSoldOut = null; // Clear the stored item
+        }
+
+        async function executeSoldOut() {
+            if (!itemToMarkSoldOut) return;
+
+            try {
+                // 1. Log the sold-out event to the server
+                const logRes = await fetch('/log-soldout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        itemId: itemToMarkSoldOut.id,
+                        itemName: itemToMarkSoldOut.name,
+                        mealType: 'Meal'
+                    })
+                });
+
+                if (!logRes.ok) {
+                    console.warn("Failed to log sold-out to server, but continuing...", await logRes.json());
+                }
+
+                // 2. Update the status on the server (hide from menu)
+                const res = await fetch(`/toggle-status/${itemToMarkSoldOut.id}`, { method: 'PATCH' });
+
+                if (res.ok) {
+                    broadcastMenuUpdate(itemToMarkSoldOut.id, 'sold-out');
+                    // Refresh the menu to remove the item from the screen
+                    fetchMenu();
+                    closeConfirmModal(); // Close the modal on success
+                } else {
+                    alert("Failed to update status on the server.");
+                    closeConfirmModal();
+                }
+            } catch (err) {
+                console.error("Sold Out Error:", err);
+                alert("Server error while trying to update item.");
+                closeConfirmModal();
+            }
+        }
+
+    </script>
+</body>
+
+</html>

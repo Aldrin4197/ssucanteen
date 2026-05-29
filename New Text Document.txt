@@ -1,0 +1,1 @@
+npm install express multer bcryptjs express-session connect-sqlite3 node-cron sqlite3

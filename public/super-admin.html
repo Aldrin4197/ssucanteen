@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SSU Canteen - Super Admin</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="auth.js"></script>
+    <style>
+        :root {
+            --bg: #f6f7fb;
+            --card: #ffffff;
+            --text: #0f172a;
+            --muted: #64748b;
+            --border: #e5e7eb;
+            --accent: #dc2626;
+            --danger: #dc2626;
+            --radius: 14px;
+            --shadow-soft: 0 10px 28px rgba(2, 6, 23, 0.06);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            display: flex;
+            min-height: 100dvh;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 240px;
+            height: 100vh;
+            background: var(--card);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 0 20px 0;
+            z-index: 2100;
+            box-shadow: var(--shadow-soft);
+        }
+
+        .sidebar-header {
+            height: 60px; 
+            padding: 15px 20px 0 20px; 
+            align-items: center; 
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+
+        .sidebar-header h2 {
+            font-size: 18px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text);
+        }
+
+        .sidebar-header h2 i {
+            color: var(--accent);
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 0 12px;
+        }
+
+        .sidebar-nav button {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            text-align: left;
+        }
+
+        .sidebar-nav button i {
+            width: 20px;
+            height: 20px;
+        }
+
+        .sidebar-nav button:hover {
+            background: rgba(220, 38, 38, 0.06);
+            color: var(--accent);
+        }
+
+        .sidebar-nav button.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        .sidebar-footer {
+            padding: 20px 12px 0;
+            border-top: 1px solid var(--border);
+            margin-top: auto;
+        }
+
+        .sidebar-footer button {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border: none;
+            background: transparent;
+            color: var(--danger);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+
+        .sidebar-footer button:hover {
+            background: rgba(220, 38, 38, 0.1);
+        }
+
+        .main-content {
+            margin-left: 240px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100dvh;
+        }
+
+        .topbar {
+            position: sticky;
+            top: 0;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            z-index: 1000;
+            box-shadow: var(--shadow-soft);
+        }
+
+        .topbar h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text);
+            margin-right: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .topbar h1 i {
+            color: var(--accent);
+        }
+
+        .content {
+            padding: 24px;
+            max-width: 1000px;
+            width: 100%;
+        }
+
+        .section {
+            display: none;
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow-soft);
+            border: 1px solid var(--border);
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .section h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text);
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #b91c1c;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+        }
+
+        .btn-danger {
+            background: #fee2e2;
+            color: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: #fecaca;
+        }
+
+        .btn-secondary {
+            background: var(--border);
+            color: var(--text);
+        }
+
+        .btn-secondary:hover {
+            background: #e2e8f0;
+        }
+
+        .table-responsive {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            margin-top: 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .users-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+            /* Forces scrolling on small screens instead of squishing */
+        }
+
+        .users-table th,
+        .users-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .users-table th {
+            background: #f9fafb;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .users-table tr:hover {
+            background: #f9fafb;
+        }
+
+        .role-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .role-superadmin {
+            background: #fecaca;
+            color: #991b1b;
+        }
+
+        .role-admin {
+            background: #bfdbfe;
+            color: #1e40af;
+        }
+
+        .role-pos {
+            background: #bbf7d0;
+            color: #065f46;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .action-buttons button {
+            padding: 6px 12px;
+            font-size: 12px;
+            margin-bottom: 0;
+        }
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .message.show {
+            display: block;
+        }
+
+        .message.success {
+            background: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #bbf7d0;
+        }
+
+        .message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: 70px;
+                bottom: 0;
+                top: auto;
+                flex-direction: row;
+                padding: 0;
+                border-right: none;
+                border-top: 1px solid var(--border);
+                background: rgba(255, 255, 255, 0.98);
+                backdrop-filter: blur(12px);
+                z-index: 2100;
+            }
+
+            .sidebar-header {
+                display: none;
+            }
+
+            .sidebar-nav {
+                flex-direction: row;
+                width: 75%;
+                padding: 0;
+                gap: 0;
+            }
+
+            .sidebar-footer {
+                display: flex;
+                width: 25%;
+                padding: 0;
+                border-top: none;
+                margin: 0;
+            }
+
+            .sidebar-nav button,
+            .sidebar-footer button {
+                flex: 1;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                padding: 8px 4px;
+                font-size: 11px;
+                gap: 4px;
+                border-radius: 0;
+                height: 100%;
+                text-align: center;
+            }
+
+            .sidebar-nav button i,
+            .sidebar-footer button i {
+                width: 20px;
+                height: 20px;
+                margin: 0 auto;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding-bottom: 80px;
+                /* Provides space so bottom nav doesn't hide content */
+            }
+
+            .topbar {
+                padding: 0 16px;
+            }
+
+            .content {
+                padding: 16px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            .section {
+                padding: 16px;
+            }
+
+            .users-table th,
+            .users-table td {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h2><i data-lucide="shield-check" style="width: 24px; height: 24px;"></i>Super Admin</h2>
+        </div>
+
+        <nav class="sidebar-nav">
+            <button class="active" onclick="showSection('register')" id="nav-register">
+                <i data-lucide="user-plus"></i>
+                <span>Register User</span>
+            </button>
+            <button onclick="showSection('manage')" id="nav-manage">
+                <i data-lucide="users"></i>
+                <span>Manage Users</span>
+            </button>
+            <button onclick="showSection('password')" id="nav-password">
+                <i data-lucide="lock"></i>
+                <span>Super Admin Password</span>
+            </button>
+        </nav>
+
+        <div class="sidebar-footer">
+            <button onclick="handleLogout()">
+                <i data-lucide="log-out"></i>
+                <span>Logout</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="topbar">
+            <h1 id="pageTitle"><i data-lucide="user-plus"
+                    style="width: 24px; height: 24px; margin-right: 0px;"></i>Register New User</h1>
+        </div>
+
+        <div class="content">
+            <div id="section-register" class="section active">
+                <h2><i data-lucide="user-plus" style="width: 20px; height: 20px;"></i> Register New User</h2>
+
+                <div id="registerMessage" class="message"></div>
+
+                <form id="registerForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="newUsername">Username</label>
+                            <input type="text" id="newUsername" placeholder="e.g., newcashier" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="newPassword">Password</label>
+                            <input type="password" id="newPassword" placeholder="Minimum 8 characters" minlength="8"
+                                required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="newRole">Role</label>
+                            <select id="newRole" required>
+                                <option value="">Select a role</option>
+                                <option value="admin">Admin</option>
+                                <option value="pos">Cashier (POS)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label style="visibility: hidden;" class="hide-mobile">Action</label>
+                            <button type="submit" class="btn-primary" style="width: 100%;">Register User</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div id="section-manage" class="section">
+                <h2><i data-lucide="users" style="width: 20px; height: 20px;"></i> Manage Users</h2>
+
+                <div id="usersMessage" class="message"></div>
+
+                <div class="table-responsive">
+                    <table class="users-table">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Role</th>
+                                <th>Created</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr>
+                                <td colspan="4" style="text-align: center; color: var(--muted);">Loading users...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="section-password" class="section" style="background: #fef3c7; border: 1px solid #fde68a;">
+                <h2><i data-lucide="lock" style="width: 20px; height: 20px; color: #d97706;"></i> <span
+                        style="color: #92400e;">Change Super Admin Password</span></h2>
+
+                <div id="changeMyPasswordMessage" class="message"></div>
+
+                <form id="changeMyPasswordForm" style="max-width: 500px;">
+                    <div class="form-group">
+                        <label for="currentPassword" style="color: #92400e;">Current Password</label>
+                        <input type="password" id="currentPassword" placeholder="Enter your current password" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newPasswordField" style="color: #92400e;">New Password</label>
+                        <input type="password" id="newPasswordField" placeholder="Minimum 8 characters" minlength="8"
+                            required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmNewPassword" style="color: #92400e;">Confirm New Password</label>
+                        <input type="password" id="confirmNewPassword" placeholder="Confirm new password" required>
+                    </div>
+
+                    <button type="submit" class="btn-primary" style="background: #d97706; width: 100%;">Update My
+                        Password</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="changePasswordModal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 5000; align-items: center; justify-content: center; flex-direction: column;"
+        onclick="if(event.target.id === 'changePasswordModal') closeChangePasswordModal()">
+        <div style="background: white; border-radius: 12px; padding: 24px; max-width: 400px; width: 90%;">
+            <h3 id="modalTitle" style="margin-bottom: 20px; font-size: 18px;">Change Password</h3>
+
+            <div id="modalMessage" class="message" style="margin-bottom: 16px;"></div>
+
+            <form id="changePasswordForm">
+                <input type="hidden" id="modalUserId">
+
+                <div class="form-group">
+                    <label for="modalNewPassword">New Password</label>
+                    <input type="password" id="modalNewPassword" placeholder="Minimum 8 characters" minlength="8"
+                        required>
+                </div>
+
+                <div class="form-group">
+                    <label for="modalConfirmPassword">Confirm Password</label>
+                    <input type="password" id="modalConfirmPassword" placeholder="Confirm new password" required>
+                </div>
+
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <button type="button" class="btn-secondary" style="flex: 1; min-width: 120px;"
+                        onclick="closeChangePasswordModal()">Cancel</button>
+                    <button type="submit" class="btn-primary" style="flex: 1; min-width: 120px;">Update
+                        Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="changeRoleModal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 5000; align-items: center; justify-content: center; flex-direction: column;"
+        onclick="if(event.target.id === 'changeRoleModal') closeChangeRoleModal()">
+        <div style="background: white; border-radius: 12px; padding: 24px; max-width: 400px; width: 90%;">
+            <h3 id="roleModalTitle" style="margin-bottom: 20px; font-size: 18px;">Change Role</h3>
+
+            <form id="changeRoleForm">
+                <input type="hidden" id="roleModalUserId">
+
+                <div class="form-group">
+                    <label for="modalNewRole">Select New Role</label>
+                    <select id="modalNewRole" required>
+                        <option value="admin">Admin</option>
+                        <option value="pos">Cashier (POS)</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px;">
+                    <button type="button" class="btn-secondary" style="flex: 1; min-width: 120px;"
+                        onclick="closeChangeRoleModal()">Cancel</button>
+                    <button type="submit" class="btn-primary" style="flex: 1; min-width: 120px;">Update Role</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="deleteUserModal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 6000; align-items: center; justify-content: center;"
+        onclick="if(event.target.id === 'deleteUserModal') closeDeleteModal()">
+        <div
+            style="background: white; border-radius: 16px; padding: 32px; max-width: 400px; width: 90%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+            <div
+                style="width: 64px; height: 64px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                <i data-lucide="trash-2" style="width: 32px; height: 32px; color: #dc2626;"></i>
+            </div>
+            <h3 style="margin-bottom: 12px; font-size: 20px; font-weight: 700; color: #1f2937;">Delete User</h3>
+            <p id="deleteModalText" style="margin-bottom: 24px; color: #6b7280; font-size: 15px; line-height: 1.5;">Are
+                you
+                sure you want to delete this user? This action cannot be undone.</p>
+
+            <input type="hidden" id="deleteModalUserId">
+
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button type="button" class="btn-secondary" style="flex: 1; padding: 12px 20px; min-width: 120px;"
+                    onclick="closeDeleteModal()">Cancel</button>
+                <button type="button" class="btn-danger"
+                    style="flex: 1; padding: 12px 20px; background: #dc2626; color: white; min-width: 120px;"
+                    onclick="confirmDeleteUser()">Delete User</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="logoutModal"
+        style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 6000; align-items: center; justify-content: center;"
+        onclick="if(event.target.id === 'logoutModal') closeLogoutModal()">
+        <div
+            style="background: white; border-radius: 16px; padding: 32px; max-width: 400px; width: 90%; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.3);">
+            <div
+                style="width: 64px; height: 64px; background: #fee2e2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
+                <i data-lucide="log-out" style="width: 32px; height: 32px; color: #dc2626;"></i>
+            </div>
+            <h3 style="margin-bottom: 12px; font-size: 20px; font-weight: 700; color: #1f2937;">Confirm Logout</h3>
+            <p style="margin-bottom: 24px; color: #6b7280; font-size: 15px; line-height: 1.5;">Are you sure you want to
+                logout? You will need to sign in again to access your account.</p>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                <button type="button" class="btn-secondary" style="flex: 1; padding: 12px 20px; min-width: 120px;"
+                    onclick="closeLogoutModal()">Cancel</button>
+                <button type="button" class="btn-danger"
+                    style="flex: 1; padding: 12px 20px; background: #dc2626; color: white; min-width: 120px;"
+                    onclick="confirmLogout()">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUsers();
+            setupEventListeners();
+        });
+
+        // Section navigation
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+
+            document.querySelectorAll('.sidebar-nav button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            document.getElementById('section-' + sectionId).classList.add('active');
+            document.getElementById('nav-' + sectionId).classList.add('active');
+
+            const titles = {
+                'register': { icon: 'user-plus', text: 'Register New User' },
+                'manage': { icon: 'users', text: 'Manage Users' },
+                'password': { icon: 'lock', text: 'Change Super Admin Password' }
+            };
+
+            const title = titles[sectionId];
+            document.getElementById('pageTitle').innerHTML =
+                `<i data-lucide="${title.icon}" style="width: 24px; height: 24px; margin-right: 0px;"></i>${title.text}`;
+
+            lucide.createIcons();
+        }
+
+        function setupEventListeners() {
+            document.getElementById('registerForm').addEventListener('submit', registerUser);
+        }
+
+        // Load all users from API
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const data = await response.json();
+
+                if (data.success) {
+                    displayUsers(data.users);
+                } else {
+                    showMessage('usersMessage', 'Failed to load users', 'error');
+                }
+            } catch (error) {
+                showMessage('usersMessage', 'Error loading users: ' + error.message, 'error');
+            }
+        }
+
+        function displayUsers(users) {
+            const tbody = document.getElementById('usersTableBody');
+            tbody.innerHTML = '';
+
+            if (users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--muted);">No users found</td></tr>';
+                return;
+            }
+
+            users.forEach(user => {
+                const createdDate = new Date(user.createdAt).toLocaleDateString();
+                const roleClass = 'role-' + user.role;
+                const isSupAdmin = user.role === 'super-admin';
+
+                let actionButtons = '';
+                if (!isSupAdmin) {
+                    actionButtons = `
+                <div class="action-buttons">
+                    <button class="btn-secondary" onclick="openChangeRoleModal(${user.id}, '${user.role}', '${user.email}')">Change Role</button>
+                    <button class="btn-secondary" onclick="openChangePasswordModal(${user.id}, '${user.email}')">Change Pass</button>
+                    <button class="btn-danger" onclick="openDeleteModal(${user.id}, '${user.email}')">Delete</button>
+                    </div>
+            `;
+                } else {
+                    actionButtons = '<span style="color: var(--muted); font-size: 12px;">Super Admin</span>';
+                }
+
+                const row = document.createElement('tr');
+                // Notice we removed the ${roleOptions} dropdown from the role column here!
+                row.innerHTML = `
+            <td><strong>${user.email}</strong></td>
+            <td><span class="role-badge ${roleClass}">${user.role}</span></td>
+            <td>${createdDate}</td>
+            <td>${actionButtons}</td>
+        `;
+                tbody.appendChild(row);
+            });
+
+            lucide.createIcons();
+        }
+
+        // Register new user
+        async function registerUser(e) {
+            e.preventDefault();
+
+            const username = document.getElementById('newUsername').value.trim();
+            const password = document.getElementById('newPassword').value;
+            const role = document.getElementById('newRole').value;
+
+            if (!username || !password || !role) {
+                showMessage('registerMessage', 'All fields are required', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: username, password, role })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('registerMessage', `User "${username}" registered successfully!`, 'success');
+                    document.getElementById('registerForm').reset();
+                    setTimeout(() => loadUsers(), 500);
+                } else {
+                    showMessage('registerMessage', data.message || 'Registration failed', 'error');
+                }
+            } catch (error) {
+                showMessage('registerMessage', 'Error: ' + error.message, 'error');
+            }
+        }
+
+        // Change user role
+        // Open Change Role Modal
+        function openChangeRoleModal(userId, currentRole, email) {
+            document.getElementById('roleModalUserId').value = userId;
+            document.getElementById('roleModalTitle').textContent = `Change Role for ${email}`;
+            document.getElementById('modalNewRole').value = currentRole;
+            document.getElementById('changeRoleModal').style.display = 'flex';
+        }
+
+        // Close Change Role Modal
+        function closeChangeRoleModal() {
+            document.getElementById('changeRoleModal').style.display = 'none';
+            document.getElementById('changeRoleForm').reset();
+        }
+
+        // Submit New Role
+        document.getElementById('changeRoleForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const userId = document.getElementById('roleModalUserId').value;
+            const newRole = document.getElementById('modalNewRole').value;
+
+            try {
+                const response = await fetch(`/api/users/${userId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ role: newRole })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('usersMessage', data.message || 'Role updated successfully', 'success');
+                    closeChangeRoleModal();
+                    setTimeout(() => loadUsers(), 500);
+                } else {
+                    showMessage('usersMessage', data.message || 'Failed to update user', 'error');
+                }
+            } catch (error) {
+                showMessage('usersMessage', 'Error: ' + error.message, 'error');
+            }
+        });
+
+        // 1. Open Delete Modal
+        function openDeleteModal(userId, email) {
+            document.getElementById('deleteModalUserId').value = userId;
+            document.getElementById('deleteModalText').innerHTML = `Are you sure you want to delete <strong>${email}</strong>? This action cannot be undone.`;
+            document.getElementById('deleteUserModal').style.display = 'flex';
+            lucide.createIcons();
+        }
+
+        // 2. Close Delete Modal
+        function closeDeleteModal() {
+            document.getElementById('deleteUserModal').style.display = 'none';
+        }
+
+        // 3. Confirm and Execute Delete
+        async function confirmDeleteUser() {
+            const userId = document.getElementById('deleteModalUserId').value;
+
+            try {
+                const response = await fetch(`/api/users/${userId}`, {
+                    method: 'DELETE'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('usersMessage', data.message || 'User deleted successfully', 'success');
+                    closeDeleteModal(); // Hide the modal on success
+                    setTimeout(() => loadUsers(), 500); // Refresh the table
+                } else {
+                    showMessage('usersMessage', data.message || 'Failed to delete user', 'error');
+                }
+            } catch (error) {
+                showMessage('usersMessage', 'Error: ' + error.message, 'error');
+            }
+        }
+
+        // Show message
+        function showMessage(elementId, message, type) {
+            const element = document.getElementById(elementId);
+            element.textContent = message;
+            element.className = 'message show ' + type;
+
+            setTimeout(() => {
+                element.classList.remove('show');
+            }, 5000);
+        }
+
+        // Logout function
+        function handleLogout() {
+            document.getElementById('logoutModal').style.display = 'flex';
+            lucide.createIcons();
+        }
+
+        function closeLogoutModal() {
+            document.getElementById('logoutModal').style.display = 'none';
+        }
+
+        function confirmLogout() {
+            fetch('/api/logout', {
+                method: 'POST'
+            }).then(response => {
+                if (response.ok) {
+                    window.location.href = '/login.html';
+                }
+            }).catch(error => {
+                console.error('Logout error:', error);
+                alert('Logout failed. Please try again.');
+            });
+        }
+
+        // Change My Password
+        document.getElementById('changeMyPasswordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPasswordField').value;
+            const confirmPassword = document.getElementById('confirmNewPassword').value;
+
+            if (newPassword !== confirmPassword) {
+                showMessage('changeMyPasswordMessage', 'New passwords do not match', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: null,
+                        currentPassword,
+                        newPassword
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage('changeMyPasswordMessage', data.message, 'success');
+                    document.getElementById('changeMyPasswordForm').reset();
+                } else {
+                    showMessage('changeMyPasswordMessage', data.message || 'Failed to change password', 'error');
+                }
+            } catch (error) {
+                showMessage('changeMyPasswordMessage', 'Error: ' + error.message, 'error');
+            }
+        });
+
+        // Open Change Password Modal
+        function openChangePasswordModal(userId, userEmail) {
+            document.getElementById('modalUserId').value = userId;
+            document.getElementById('modalTitle').textContent = `Change Password for ${userEmail}`;
+            document.getElementById('changePasswordModal').style.display = 'flex';
+            document.getElementById('modalNewPassword').focus();
+        }
+
+        // Close Change Password Modal
+        function closeChangePasswordModal() {
+            document.getElementById('changePasswordModal').style.display = 'none';
+            document.getElementById('changePasswordForm').reset();
+            document.getElementById('modalMessage').textContent = '';
+            document.getElementById('modalMessage').className = 'message';
+        }
+
+        // Submit Change Password Form
+        document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const userId = parseInt(document.getElementById('modalUserId').value);
+            const newPassword = document.getElementById('modalNewPassword').value;
+            const confirmPassword = document.getElementById('modalConfirmPassword').value;
+            const messageEl = document.getElementById('modalMessage');
+
+            if (newPassword !== confirmPassword) {
+                messageEl.textContent = 'Passwords do not match';
+                messageEl.className = 'message show error';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId,
+                        newPassword
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    messageEl.textContent = data.message;
+                    messageEl.className = 'message show success';
+                    setTimeout(() => closeChangePasswordModal(), 1500);
+                } else {
+                    messageEl.textContent = data.message || 'Failed to change password';
+                    messageEl.className = 'message show error';
+                }
+            } catch (error) {
+                messageEl.textContent = 'Error: ' + error.message;
+                messageEl.className = 'message show error';
+            }
+        });
+    </script>
+</body>
+
+</html>

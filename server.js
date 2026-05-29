@@ -52,7 +52,7 @@ if (isProduction) {
 
 // Configure secure session management
 app.use(session({
-    store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI }),
+    store: new MongoStore({ mongoUrl: process.env.MONGODB_URI }),
     secret: process.env.SESSION_SECRET || 'your-secret-key-change-in-production',
     resave: false,
     saveUninitialized: false,

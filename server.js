@@ -7,12 +7,10 @@ const bcryptjs = require('bcryptjs');
 const session = require('express-session');
 const SQLiteStore = require('connect-sqlite3')(session);
 
+const mongoose = require('./db');
+const User = require('./models/User');
 const app = express();
 const upload = multer({ dest: 'uploads/' });
-const DATA_FILE = './data.json';
-const USERS_FILE = './users.json';
-const MENU_HISTORY_FILE = './menu-history.json';
-const MENU_PAGE_SETTINGS_FILE = './menu-page-settings.json';
 const realtimeClients = new Set();
 const isProduction = process.env.NODE_ENV === 'production';
 
@@ -36,148 +34,9 @@ function broadcastRealtimeEvent(type, payload = {}) {
 
 
 // --- USER AUTHENTICATION ---
-const loadUsers = () => {
-    if (fs.existsSync(USERS_FILE)) {
-        try {
-            return JSON.parse(fs.readFileSync(USERS_FILE));
-        } catch (e) {
-            return [];
-        }
-    }
-    return [];
-};
+let users = [];
 
-const saveUsers = (users) => {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-};
-
-let users = loadUsers();
-
-// --- DATABASE LOGIC ---
-const loadData = () => {
-    if (fs.existsSync(DATA_FILE)) {
-        try {
-            return JSON.parse(fs.readFileSync(DATA_FILE));
-        } catch (e) {
-            return [];
-        }
-    }
-    return [];
-};
-
-const saveData = (data) => {
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-};
-
-const getDefaultMenuPageSettings = () => ({
-    isOpen: true,
-    contactInfo: ''
-});
-
-const loadMenuPageSettings = () => {
-    if (fs.existsSync(MENU_PAGE_SETTINGS_FILE)) {
-        try {
-            const savedSettings = JSON.parse(fs.readFileSync(MENU_PAGE_SETTINGS_FILE));
-            return {
-                ...getDefaultMenuPageSettings(),
-                ...savedSettings
-            };
-        } catch (e) {
-            return getDefaultMenuPageSettings();
-        }
-    }
-
-    return getDefaultMenuPageSettings();
-};
-
-const saveMenuPageSettings = (settings) => {
-    fs.writeFileSync(MENU_PAGE_SETTINGS_FILE, JSON.stringify(settings, null, 2));
-};
-
-const getSnapshotDateKey = () => {
-    return new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'Asia/Manila',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    }).format(new Date());
-};
-
-const snapshotMenuForDate = (targetDate = getSnapshotDateKey()) => {
-    const activeItems = db
-        .filter(item => item.status === 'active')
-        .map(item => ({
-            id: item.id,
-            name: item.name,
-            price: item.price,
-            url: item.url
-        }));
-    const activeItemMap = new Map(activeItems.map(item => [item.id, item]));
-
-    dbSqlite.get(
-        "SELECT items FROM menu_history WHERE date = ?",
-        [targetDate],
-        (readErr, existingRow) => {
-            if (readErr) {
-                console.error("Error reading existing menu history snapshot:", readErr);
-                return;
-            }
-
-            let existingItems = [];
-            if (existingRow?.items) {
-                try {
-                    existingItems = JSON.parse(existingRow.items) || [];
-                } catch (parseErr) {
-                    console.error("Error parsing existing menu history snapshot:", parseErr);
-                }
-            }
-
-            // Keep items that were already posted earlier today, and refresh details
-            // for any item that is currently active.
-            const mergedItems = existingItems.map(item => activeItemMap.get(item.id) || item);
-            const existingIds = new Set(existingItems.map(item => item.id));
-
-            activeItems.forEach(item => {
-                if (!existingIds.has(item.id)) {
-                    mergedItems.push(item);
-                }
-            });
-
-            const snapshot = {
-                date: targetDate,
-                capturedAt: new Date().toISOString(),
-                totalItems: mergedItems.length,
-                items: mergedItems
-            };
-
-            dbSqlite.run(
-                `
-                    INSERT INTO menu_history (date, capturedAt, totalItems, items)
-                    VALUES (?, ?, ?, ?)
-                    ON CONFLICT(date) DO UPDATE SET
-                        capturedAt = excluded.capturedAt,
-                        totalItems = excluded.totalItems,
-                        items = excluded.items
-                `,
-                [snapshot.date, snapshot.capturedAt, snapshot.totalItems, JSON.stringify(snapshot.items)],
-                (writeErr) => {
-                    if (writeErr) {
-                        console.error("Error saving menu history snapshot:", writeErr);
-                    }
-                }
-            );
-        }
-    );
-
-    return {
-        date: targetDate,
-        capturedAt: new Date().toISOString(),
-        totalItems: activeItems.length,
-        items: activeItems
-    };
-};
-
-let db = loadData();
+// --- DATABASE LOGIC REMOVED (now using MongoDB) ---
 
 // Ensure uploads folder exists
 if (!fs.existsSync('./uploads')) {
@@ -357,7 +216,7 @@ app.post('/api/register', roleMiddleware(['super-admin']), async (req, res) => {
             role: role,
             createdAt: new Date().toISOString()
         };
-
+                const user = await User.findById(req.session.userId);
         users.push(newUser);
         saveUsers(users);
 
@@ -373,7 +232,6 @@ app.post('/api/register', roleMiddleware(['super-admin']), async (req, res) => {
         });
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ message: 'Server error during registration.' });
     }
 });
 
@@ -556,49 +414,90 @@ app.post('/api/change-password', authMiddleware, async (req, res) => {
 // --- CATEGORY SAVING LOGIC ---
 
 
-// Helper to save categories to file
-const saveCategories = (data) => {
-    fs.writeFileSync(CATEGORIES_FILE, JSON.stringify(data, null, 2));
-};
-
-// Route: Get saved category items when page loads
-app.get('/get-category/:category', (req, res) => {
-    const category = req.params.category;
-    const categories = loadCategories();
-    res.json(categories[category] || []);
-});
-
-// Route: Save category items permanently
-app.post('/save-category/:category', (req, res) => {
-    const category = req.params.category;
-    const items = req.body.items || [];
-    
-    // Load existing, update the specific category, and save
-    const categories = loadCategories();
-    categories[category] = items;
-    saveCategories(categories);
-    
-    console.log(`Saved ${items.length} items to ${category.toUpperCase()} category.`);
-    res.json({ success: true });
-});
+// --- CATEGORY, MENU PAGE SETTINGS, MENU HISTORY, ORDERS (MongoDB) ---
+const MenuHistory = require('./models/MenuHistory');
+const Order = require('./models/Order');
+const Category = require('./models/Category');
+const MenuPageSettings = require('./models/MenuPageSettings');
 
 // Get category items
-app.get('/get-category/:type', (req, res) => {
-    const { type } = req.params;
-    // Retrieve from wherever you saved them
-    // For now, return empty array
-    res.json([]);
+app.get('/get-category/:category', async (req, res) => {
+    const category = req.params.category;
+    try {
+        let catDoc = await Category.findOne();
+        if (!catDoc) return res.json([]);
+        res.json(catDoc[category] || []);
+    } catch (e) {
+        res.status(500).json({ message: 'Failed to fetch category.' });
+    }
 });
 
+// Save category items permanently (Admin only)
+app.post('/save-category/:category', roleMiddleware(['admin']), async (req, res) => {
+    const category = req.params.category;
+    const items = req.body.items || [];
+    try {
+        let catDoc = await Category.findOne();
+        if (!catDoc) catDoc = new Category({ snacks: [], drinks: [] });
+        catDoc[category] = items;
+        await catDoc.save();
+        console.log(`Saved ${items.length} items to ${category.toUpperCase()} category.`);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ message: 'Failed to save category.' });
+    }
+});
+
+// Get menu page settings
+app.get('/menu-page-settings', async (req, res) => {
+    try {
+        let settings = await MenuPageSettings.findOne();
+        if (!settings) {
+            settings = new MenuPageSettings();
+            await settings.save();
+        }
+        res.json(settings);
+    } catch (e) {
+        res.status(500).json({ message: 'Failed to fetch settings.' });
+    }
+});
+
+// Update menu page settings
+app.put('/menu-page-settings', roleMiddleware(['admin', 'super-admin']), async (req, res) => {
+    try {
+        let settings = await MenuPageSettings.findOne();
+        if (!settings) settings = new MenuPageSettings();
+        settings.isOpen = req.body.isOpen !== false;
+        settings.contactInfo = typeof req.body.contactInfo === 'string' ? req.body.contactInfo.trim() : '';
+        await settings.save();
+        broadcastRealtimeEvent('MENU_PAGE_SETTINGS_UPDATED', settings);
+        res.json({ success: true, settings });
+    } catch (e) {
+        res.status(500).json({ message: 'Failed to update settings.' });
+    }
+});
+
+
+const Inventory = require('./models/Inventory');
+
 // 1. Admin: Get all items
-app.get('/images', roleMiddleware(['admin']), (req, res) => {
-    res.json(db);
+app.get('/images', roleMiddleware(['admin']), async (req, res) => {
+    try {
+        const items = await Inventory.find();
+        res.json(items);
+    } catch (e) {
+        res.status(500).json({ message: 'Failed to fetch items.' });
+    }
 });
 
 // 2. Customer: Get only "posted" (active) items
-app.get('/customer-menu', (req, res) => {
-    const activeItems = db.filter(item => item.status === "active");
-    res.json(activeItems);
+app.get('/customer-menu', async (req, res) => {
+    try {
+        const activeItems = await Inventory.find({ status: 'active' });
+        res.json(activeItems);
+    } catch (e) {
+        res.status(500).json({ message: 'Failed to fetch menu.' });
+    }
 });
 
 app.get('/menu-page-settings', (req, res) => {
@@ -621,132 +520,93 @@ app.put('/menu-page-settings', roleMiddleware(['admin', 'super-admin']), (req, r
 app.get('/menu-history', roleMiddleware(['admin']), (req, res) => {
     const { date } = req.query;
     if (!date) {
-        return dbSqlite.all(
-            "SELECT date, totalItems, capturedAt FROM menu_history ORDER BY date DESC",
-            [],
-            (err, rows) => {
-                if (err) {
-                    console.error("Error fetching menu history dates:", err);
-                    return res.status(500).json({ message: 'Failed to load menu history.' });
-                }
-
-                res.json({ dates: rows || [] });
-            }
-        );
+        // Return all menu history dates
+        MenuHistory.find({}, 'date totalItems capturedAt').sort({ date: -1 }).then(rows => {
+            res.json({ dates: rows || [] });
+        }).catch(err => {
+            console.error("Error fetching menu history dates:", err);
+            res.status(500).json({ message: 'Failed to load menu history.' });
+        });
+        return;
     }
-
-    dbSqlite.get(
-        "SELECT date, capturedAt, totalItems, items FROM menu_history WHERE date = ?",
-        [date],
-        (err, row) => {
-            if (err) {
-                console.error("Error fetching menu history snapshot:", err);
-                return res.status(500).json({ message: 'Failed to load menu history.' });
-            }
-
-            if (!row) {
-                return res.status(404).json({ message: 'No menu history found for that date.' });
-            }
-
-            let items = [];
-            try {
-                items = JSON.parse(row.items || '[]');
-            } catch (parseError) {
-                console.error("Error parsing menu history items:", parseError);
-            }
-
-            res.json({
-                date: row.date,
-                capturedAt: row.capturedAt,
-                totalItems: row.totalItems,
-                items
-            });
-        }
-    );
+    MenuHistory.findOne({ date }).then(row => {
+        if (!row) return res.status(404).json({ message: 'No menu history found for that date.' });
+        res.json({
+            date: row.date,
+            capturedAt: row.capturedAt,
+            totalItems: row.totalItems,
+            items: row.items || []
+        });
+    }).catch(err => {
+        console.error("Error fetching menu history snapshot:", err);
+        res.status(500).json({ message: 'Failed to load menu history.' });
+    });
 });
 
 // 3. Upload new item (Admin only, defaults to 'hidden')
-app.post('/upload', roleMiddleware(['admin']), upload.single('photo'), (req, res) => {
+app.post('/upload', roleMiddleware(['admin']), upload.single('photo'), async (req, res) => {
     if (!req.file) return res.status(400).send('No file uploaded.');
-
-    const newEntry = {
-        id: Date.now().toString(),
-        url: `/uploads/${req.file.filename}`,
-        name: req.body.photoName || "Untitled",
-        price: req.body.photoPrice || "0.00",
-        status: "hidden" // Admin must click "Post" to show to customers
-    };
-
-    db.push(newEntry);
-    saveData(db);
-    res.status(201).json(newEntry);
+    try {
+        const newEntry = new Inventory({
+            url: `/uploads/${req.file.filename}`,
+            name: req.body.photoName || "Untitled",
+            price: req.body.photoPrice || "0.00",
+            status: "hidden"
+        });
+        await newEntry.save();
+        res.status(201).json(newEntry);
+    } catch (e) {
+        res.status(500).json({ message: 'Failed to upload item.' });
+    }
 });
 
 // 4. Toggle Post Status (Admin only)
-app.patch('/toggle-status/:id', roleMiddleware(['admin', 'pos']), (req, res) => {
-    const { id } = req.params;
-    const item = db.find(i => i.id === id);
-    if (item) {
+app.patch('/toggle-status/:id', roleMiddleware(['admin', 'pos']), async (req, res) => {
+    try {
+        const item = await Inventory.findById(req.params.id);
+        if (!item) return res.status(404).json({ message: "Item not found" });
         item.status = item.status === "active" ? "hidden" : "active";
-        saveData(db);
-        snapshotMenuForDate();
-        return res.json({ success: true, status: item.status });
+        await item.save();
+        // TODO: snapshotMenuForDate() migration
+        res.json({ success: true, status: item.status });
+    } catch (e) {
+        res.status(500).json({ message: 'Failed to toggle status.' });
     }
-    res.status(404).json({ message: "Item not found" });
 });
 
 // 5. Edit Name and Price (Admin only)
-app.put('/edit/:id', roleMiddleware(['admin']), (req, res) => {
-    const { id } = req.params;
-    const { name, price } = req.body;
-    const itemIndex = db.findIndex(item => item.id === id);
-    
-    if (itemIndex > -1) {
-        db[itemIndex].name = name;
-        db[itemIndex].price = price;
-        saveData(db);
-        if (db[itemIndex].status === 'active') {
-            snapshotMenuForDate();
-        }
-        return res.json({ success: true });
+app.put('/edit/:id', roleMiddleware(['admin']), async (req, res) => {
+    try {
+        const { name, price } = req.body;
+        const item = await Inventory.findById(req.params.id);
+        if (!item) return res.status(404).json({ message: "Item not found" });
+        item.name = name;
+        item.price = price;
+        await item.save();
+        // TODO: snapshotMenuForDate() migration
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ message: 'Failed to edit item.' });
     }
-    res.status(404).json({ message: "Item not found" });
 });
 
 // 6. Delete Item and File (Admin only)
-app.delete('/delete/:id', roleMiddleware(['admin']), (req, res) => {
-    const { id } = req.params;
-    const itemIndex = db.findIndex(item => item.id === id);
-    
-    if (itemIndex > -1) {
-        const item = db[itemIndex];
+app.delete('/delete/:id', roleMiddleware(['admin']), async (req, res) => {
+    try {
+        const item = await Inventory.findById(req.params.id);
+        if (!item) return res.status(404).json({ message: "Item not found" });
+        // Remove file from uploads
         const filePath = path.join(__dirname, item.url);
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        
-        db.splice(itemIndex, 1);
-        saveData(db);
-        if (item.status === 'active') {
-            snapshotMenuForDate();
-        }
-        return res.json({ success: true });
+        await item.deleteOne();
+        // TODO: snapshotMenuForDate() migration
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ message: 'Failed to delete item.' });
     }
-    res.status(404).json({ message: "Item not found" });
 });
 
-// --- CATEGORY SAVING LOGIC ---
-const CATEGORIES_FILE = './categories.json';
-
-// Helper to load categories
-const loadCategories = () => {
-    if (fs.existsSync(CATEGORIES_FILE)) {
-        try {
-            return JSON.parse(fs.readFileSync(CATEGORIES_FILE));
-        } catch (e) {
-            return { snacks: [], drinks: [] };
-        }
-    }
-    return { snacks: [], drinks: [] };
-};
+// --- CATEGORY SAVING LOGIC REMOVED (now using MongoDB) ---
 
 
 
@@ -768,13 +628,7 @@ app.post('/save-category/:category', roleMiddleware(['admin']), (req, res) => {
 
 
 
-// Helper to load/save orders
-const loadOrders = () => {
-    if (fs.existsSync(ORDERS_FILE)) {
-        return JSON.parse(fs.readFileSync(ORDERS_FILE));
-    }
-    return [];
-};
+// --- ORDER FILE LOGIC REMOVED (now using MongoDB) ---
 
 
 
@@ -949,69 +803,45 @@ app.post('/place-order', roleMiddleware(['admin', 'pos']), (req, res) => {
     res.status(201).json({ success: true });
 });
 
-// New Route: Get History (For your Admin History tab)
-// Route: Get History (Reads from SQLite)
-app.get('/order-history', (req, res) => {
-    dbSqlite.all("SELECT * FROM orders ORDER BY id DESC", [], (err, rows) => {
-        if (err) {
-            console.error("Error fetching orders:", err);
-            return res.status(500).json({ error: err.message });
-        }
-        
-        // Convert the stringified items back into arrays for the frontend
-        const formattedOrders = rows.map(row => ({
-            ...row,
-            items: JSON.parse(row.items)
-        }));
-        
-        res.json(formattedOrders);
-    });
+// Get all orders (Admin/pos)
+app.get('/order-history', roleMiddleware(['admin', 'pos']), async (req, res) => {
+    try {
+        const orders = await Order.find().sort({ id: -1 });
+        res.json(orders);
+    } catch (err) {
+        console.error("Error fetching orders:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// Route: Update Order Status (Updates SQLite)
-app.patch('/update-order-status/:id', (req, res) => {
+// Update order status
+app.patch('/update-order-status/:id', roleMiddleware(['admin', 'pos']), async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
-
-    dbSqlite.run(
-        "UPDATE orders SET status = ? WHERE id = ?",
-        [status, id],
-        function(err) {
-            if (err) {
-                console.error("Error updating order:", err);
-                return res.status(500).json({ error: err.message });
-            }
-            if (this.changes === 0) {
-                return res.status(404).json({ message: "Order not found" });
-            }
-            
-            console.log(`Order ${id} updated to ${status} in SQLite`);
-            res.status(200).json({ success: true });
-        }
-    );
+    try {
+        const order = await Order.findOneAndUpdate({ id }, { status }, { new: true });
+        if (!order) return res.status(404).json({ message: "Order not found" });
+        console.log(`Order ${id} updated to ${status} in MongoDB`);
+        res.status(200).json({ success: true });
+    } catch (err) {
+        console.error("Error updating order:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
-// Route: Update Unreturned Change Amount
-app.patch('/update-unreturned-change/:id', (req, res) => {
+// Update unreturned change amount
+app.patch('/update-unreturned-change/:id', roleMiddleware(['admin', 'pos']), async (req, res) => {
     const { id } = req.params;
     const { unreturnedChangeAmount } = req.body;
-
-    dbSqlite.run(
-        "UPDATE orders SET unreturnedChangeAmount = ? WHERE id = ?",
-        [unreturnedChangeAmount, id],
-        function(err) {
-            if (err) {
-                console.error("Error updating unreturned change:", err);
-                return res.status(500).json({ error: err.message });
-            }
-            if (this.changes === 0) {
-                return res.status(404).json({ message: "Order not found" });
-            }
-            
-            console.log(`Order ${id} unreturned change updated to ₱${unreturnedChangeAmount} in SQLite`);
-            res.status(200).json({ success: true });
-        }
-    );
+    try {
+        const order = await Order.findOneAndUpdate({ id }, { unreturnedChangeAmount }, { new: true });
+        if (!order) return res.status(404).json({ message: "Order not found" });
+        console.log(`Order ${id} unreturned change updated to ₱${unreturnedChangeAmount} in MongoDB`);
+        res.status(200).json({ success: true });
+    } catch (err) {
+        console.error("Error updating unreturned change:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // --- SCHEDULED TASKS ---
@@ -1034,12 +864,7 @@ cron.schedule('23 8 * * *', () => {
     }
 });
 
-const sqlite3 = require('sqlite3').verbose();
-
-// Initialize SQLite Database
-const dbSqlite = new sqlite3.Database('./canteen.db', (err) => {
-    if (err) console.error("Database opening error: ", err);
-});
+// SQLite logic removed (now using MongoDB)
 
 const normalizeInventoryCategory = (value) => {
     const normalized = String(value || '').trim().toLowerCase();

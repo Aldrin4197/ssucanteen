@@ -34,7 +34,7 @@ function broadcastRealtimeEvent(type, payload = {}) {
 
 
 // --- USER AUTHENTICATION ---
-let users = [];
+
 
 // --- DATABASE LOGIC REMOVED (now using MongoDB) ---
 
@@ -98,17 +98,21 @@ app.get('/realtime-events', (req, res) => {
 
 
 // --- AUTHENTICATION MIDDLEWARE ---
-const authMiddleware = (req, res, next) => {
+
+const authMiddleware = async (req, res, next) => {
     if (req.session && req.session.userId) {
-        // Find user and populate req.user object
-        const user = users.find(u => u.id === req.session.userId);
-        if (user) {
-            req.user = {
-                id: user.id,
-                email: user.email,
-                role: user.role
-            };
-            return next();
+        try {
+            const user = await User.findById(req.session.userId);
+            if (user) {
+                req.user = {
+                    id: user._id,
+                    email: user.email,
+                    role: user.role
+                };
+                return next();
+            }
+        } catch (e) {
+            // fall through
         }
     }
     res.status(401).json({ message: 'Unauthorized. Please login.' });
@@ -116,16 +120,24 @@ const authMiddleware = (req, res, next) => {
 
 // Role-based middleware
 const roleMiddleware = (requiredRoles) => {
-    return (req, res, next) => {
+    return async (req, res, next) => {
         if (!req.session || !req.session.userId) {
             return res.status(401).json({ message: 'Unauthorized. Please login.' });
         }
-        const user = users.find(u => u.id === req.session.userId);
-        if (!user || !requiredRoles.includes(user.role)) {
-            return res.status(403).json({ message: 'Forbidden. Insufficient permissions.' });
+        try {
+            const user = await User.findById(req.session.userId);
+            if (!user || !requiredRoles.includes(user.role)) {
+                return res.status(403).json({ message: 'Forbidden. Insufficient permissions.' });
+            }
+            req.user = {
+                id: user._id,
+                email: user.email,
+                role: user.role
+            };
+            next();
+        } catch (e) {
+            res.status(401).json({ message: 'Unauthorized. Please login.' });
         }
-        req.user = user;
-        next();
     };
 };
 
@@ -134,17 +146,16 @@ const roleMiddleware = (requiredRoles) => {
 // --- AUTHENTICATION API ---
 
 // Check if user is authenticated
-app.get('/api/check-session', (req, res) => {
+app.get('/api/check-session', async (req, res) => {
     if (req.session && req.session.userId) {
-        const user = users.find(u => u.id === req.session.userId);
-        if (user) {
-            res.json({ authenticated: true, role: user.role, email: user.email });
-        } else {
-            res.json({ authenticated: false });
-        }
-    } else {
-        res.json({ authenticated: false });
+        try {
+            const user = await User.findById(req.session.userId);
+            if (user) {
+                return res.json({ authenticated: true, role: user.role, email: user.email });
+            }
+        } catch (e) {}
     }
+    res.json({ authenticated: false });
 });
 
 // Login route
@@ -155,24 +166,17 @@ app.post('/api/login', async (req, res) => {
         return res.status(400).json({ message: 'Email and password are required.' });
     }
 
-    const user = users.find(u => u.email === email.toLowerCase());
-    
-    if (!user) {
-        // Don't reveal if user exists (security best practice)
-        return res.status(401).json({ message: 'Invalid username or password.' });
-    }
-
     try {
+        const user = await User.findOne({ email: email.toLowerCase() });
+        if (!user) {
+            return res.status(401).json({ message: 'Invalid username or password.' });
+        }
         const passwordMatch = await bcryptjs.compare(password, user.password);
-        
         if (!passwordMatch) {
             return res.status(401).json({ message: 'Invalid username or password.' });
         }
-
-        // Login successful - create session
-        req.session.userId = user.id;
+        req.session.userId = user._id;
         req.session.email = user.email;
-        
         console.log(`User logged in: ${user.email} (${user.role})`);
         res.json({ success: true, role: user.role, email: user.email });
     } catch (error) {
@@ -193,45 +197,38 @@ app.post('/api/register', roleMiddleware(['super-admin']), async (req, res) => {
         return res.status(400).json({ message: 'Password must be at least 8 characters long.' });
     }
 
-    // Check if email already exists
-    const existingUser = users.find(u => u.email === email.toLowerCase());
-    if (existingUser) {
-        return res.status(409).json({ message: 'Email already registered.' });
-    }
-
     // Validate role (super-admin can create any role)
     if (!['super-admin', 'admin', 'pos'].includes(role)) {
         return res.status(400).json({ message: 'Invalid role.' });
     }
 
     try {
+        // Check if email already exists
+        const existingUser = await User.findOne({ email: email.toLowerCase() });
+        if (existingUser) {
+            return res.status(409).json({ message: 'Email already registered.' });
+        }
         // Hash password
         const hashedPassword = await bcryptjs.hash(password, 10);
-
         // Create new user
-        const newUser = {
-            id: Math.max(...users.map(u => u.id), 0) + 1,
+        const newUser = await User.create({
             email: email.toLowerCase(),
             password: hashedPassword,
-            role: role,
-            createdAt: new Date().toISOString()
-        };
-                const user = await User.findById(req.session.userId);
-        users.push(newUser);
-        saveUsers(users);
-
+            role: role
+        });
         console.log(`New user registered: ${newUser.email} (${newUser.role}) by ${req.user.email}`);
         res.status(201).json({ 
             success: true, 
             message: 'User registered successfully.',
             user: {
-                id: newUser.id,
+                id: newUser._id,
                 email: newUser.email,
                 role: newUser.role
             }
         });
     } catch (error) {
         console.error('Registration error:', error);
+        res.status(500).json({ message: 'Server error during registration.' });
     }
 });
 
@@ -251,17 +248,12 @@ app.post('/api/logout', (req, res) => {
     }
 });
 
-// --- USER MANAGEMENT ROUTES (SUPER-ADMIN ONLY) ---
 
+// --- USER MANAGEMENT ROUTES (SUPER-ADMIN ONLY) ---
 // Get all users (Super-Admin only)
-app.get('/api/users', roleMiddleware(['super-admin']), (req, res) => {
+app.get('/api/users', roleMiddleware(['super-admin']), async (req, res) => {
     try {
-        const usersList = users.map(u => ({
-            id: u.id,
-            email: u.email,
-            role: u.role,
-            createdAt: u.createdAt
-        }));
+        const usersList = await User.find({}, { password: 0 });
         res.json({ success: true, users: usersList });
     } catch (error) {
         console.error('Error fetching users:', error);
@@ -270,21 +262,13 @@ app.get('/api/users', roleMiddleware(['super-admin']), (req, res) => {
 });
 
 // Get single user by ID (Super-Admin only)
-app.get('/api/users/:id', roleMiddleware(['super-admin']), (req, res) => {
+app.get('/api/users/:id', roleMiddleware(['super-admin']), async (req, res) => {
     try {
-        const user = users.find(u => u.id === parseInt(req.params.id));
+        const user = await User.findById(req.params.id, { password: 0 });
         if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
-        res.json({ 
-            success: true, 
-            user: {
-                id: user.id,
-                email: user.email,
-                role: user.role,
-                createdAt: user.createdAt
-            }
-        });
+        res.json({ success: true, user });
     } catch (error) {
         console.error('Error fetching user:', error);
         res.status(500).json({ message: 'Server error fetching user.' });
@@ -292,39 +276,26 @@ app.get('/api/users/:id', roleMiddleware(['super-admin']), (req, res) => {
 });
 
 // Update user role (Super-Admin only)
-app.put('/api/users/:id', roleMiddleware(['super-admin']), (req, res) => {
+app.put('/api/users/:id', roleMiddleware(['super-admin']), async (req, res) => {
     try {
         const { role } = req.body;
-        const userId = parseInt(req.params.id);
-
+        const userId = req.params.id;
         // Prevent super-admin from changing their own role
-        if (userId === req.user.id) {
+        if (userId === String(req.user.id)) {
             return res.status(400).json({ message: 'Cannot change your own role.' });
         }
-
         if (!['admin', 'pos'].includes(role)) {
             return res.status(400).json({ message: 'Invalid role. Must be "admin" or "pos".' });
         }
-
-        const userIndex = users.findIndex(u => u.id === userId);
-        if (userIndex === -1) {
+        const user = await User.findById(userId);
+        if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
-
-        const oldRole = users[userIndex].role;
-        users[userIndex].role = role;
-        saveUsers(users);
-
-        console.log(`User role updated: ${users[userIndex].email} (${oldRole} → ${role}) by ${req.user.email}`);
-        res.json({ 
-            success: true, 
-            message: `User role updated from ${oldRole} to ${role}.`,
-            user: {
-                id: users[userIndex].id,
-                email: users[userIndex].email,
-                role: users[userIndex].role
-            }
-        });
+        const oldRole = user.role;
+        user.role = role;
+        await user.save();
+        console.log(`User role updated: ${user.email} (${oldRole} → ${role}) by ${req.user.email}`);
+        res.json({ success: true, message: `User role updated from ${oldRole} to ${role}.`, user: { id: user._id, email: user.email, role: user.role } });
     } catch (error) {
         console.error('Error updating user:', error);
         res.status(500).json({ message: 'Server error updating user.' });
@@ -332,29 +303,19 @@ app.put('/api/users/:id', roleMiddleware(['super-admin']), (req, res) => {
 });
 
 // Delete user account (Super-Admin only)
-app.delete('/api/users/:id', roleMiddleware(['super-admin']), (req, res) => {
+app.delete('/api/users/:id', roleMiddleware(['super-admin']), async (req, res) => {
     try {
-        const userId = parseInt(req.params.id);
-
+        const userId = req.params.id;
         // Prevent super-admin from deleting themselves
-        if (userId === req.user.id) {
+        if (userId === String(req.user.id)) {
             return res.status(400).json({ message: 'Cannot delete your own account.' });
         }
-
-        const userIndex = users.findIndex(u => u.id === userId);
-        if (userIndex === -1) {
+        const user = await User.findByIdAndDelete(userId);
+        if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
-
-        const deletedUser = users[userIndex];
-        users.splice(userIndex, 1);
-        saveUsers(users);
-
-        console.log(`User deleted: ${deletedUser.email} by ${req.user.email}`);
-        res.json({ 
-            success: true, 
-            message: `User ${deletedUser.email} has been deleted.`
-        });
+        console.log(`User deleted: ${user.email} by ${req.user.email}`);
+        res.json({ success: true, message: `User ${user.email} has been deleted.` });
     } catch (error) {
         console.error('Error deleting user:', error);
         res.status(500).json({ message: 'Server error deleting user.' });
@@ -365,22 +326,18 @@ app.delete('/api/users/:id', roleMiddleware(['super-admin']), (req, res) => {
 app.post('/api/change-password', authMiddleware, async (req, res) => {
     try {
         const { userId, newPassword, currentPassword } = req.body;
-        
         // Validation
         if (!newPassword || newPassword.length < 8) {
             return res.status(400).json({ message: 'New password must be at least 8 characters long.' });
         }
-
-        const targetUserId = parseInt(userId) || req.user.id;
-        const userIndex = users.findIndex(u => u.id === targetUserId);
-
-        if (userIndex === -1) {
+        const targetUserId = userId || req.user.id;
+        const user = await User.findById(targetUserId);
+        if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
-
         // If super-admin is changing someone else's password, allow it
         // Otherwise, require current password verification
-        if (targetUserId !== req.user.id) {
+        if (String(targetUserId) !== String(req.user.id)) {
             if (req.user.role !== 'super-admin') {
                 return res.status(403).json({ message: 'You can only change your own password.' });
             }
@@ -389,22 +346,17 @@ app.post('/api/change-password', authMiddleware, async (req, res) => {
             if (!currentPassword) {
                 return res.status(400).json({ message: 'Current password is required.' });
             }
-            const passwordMatch = await bcryptjs.compare(currentPassword, users[userIndex].password);
+            const passwordMatch = await bcryptjs.compare(currentPassword, user.password);
             if (!passwordMatch) {
                 return res.status(401).json({ message: 'Current password is incorrect.' });
             }
         }
-
         // Hash and update password
         const hashedPassword = await bcryptjs.hash(newPassword, 10);
-        users[userIndex].password = hashedPassword;
-        saveUsers(users);
-
-        console.log(`Password changed: ${users[userIndex].email} by ${req.user.email}`);
-        res.json({ 
-            success: true, 
-            message: 'Password updated successfully.'
-        });
+        user.password = hashedPassword;
+        await user.save();
+        console.log(`Password changed: ${user.email} by ${req.user.email}`);
+        res.json({ success: true, message: 'Password updated successfully.' });
     } catch (error) {
         console.error('Error changing password:', error);
         res.status(500).json({ message: 'Server error changing password.' });
